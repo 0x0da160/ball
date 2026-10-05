@@ -239,6 +239,101 @@ window.BallAudio = (() => {
     return buf;
   }
 
+
+  // ガラス：割れの破裂音＋高い非調和のチリチリ音が降り注ぐ
+  function glass(pitch = 1, n = 18) {
+    const b = new Float32Array(len(1.0));
+    mixInto(b, burst(0.03, 0.004, 'hp', 3500, 0.7, 1.4));
+    mixInto(b, modal(0.5, 2600 * pitch, [1, 1.73, 2.61, 3.9, 5.2], [1, 0.7, 0.5, 0.4, 0.3], [0.18, 0.12, 0.09, 0.06, 0.04]), 0, 0.5);
+    for (let i = 0; i < n; i++) {
+      const t = 0.01 + Math.pow(rnd(), 1.5) * 0.7;
+      mixInto(b, modal(0.15, (3500 + rnd() * 5000) * pitch, [1, 1.9, 3.1], [1, 0.5, 0.3], [0.05, 0.03, 0.02]), t, (0.15 + rnd() * 0.3) * (1 - t));
+    }
+    return normalize(b, 0.85);
+  }
+  function glassTick() {
+    const b = new Float32Array(len(0.3));
+    mixInto(b, modal(0.3, 3000 + rnd() * 800, [1, 2.1, 3.3], [1, 0.5, 0.3], [0.09, 0.05, 0.03]));
+    mixInto(b, burst(0.01, 0.0015, 'hp', 4000, 0.7, 0.8));
+    return normalize(b, 0.7);
+  }
+  // 木：乾いた打撃＋繊維が裂ける音
+  function woodBreak() {
+    const b = new Float32Array(len(0.7));
+    mixInto(b, wood(), 0, 0.9);
+    const crack = new Float32Array(len(0.25));
+    for (let i = 0; i < crack.length; i++) crack[i] = (rnd() < 0.08 ? white() * 2 : white() * 0.3) * Math.exp(-i / sr / 0.07);
+    biquad(crack, 'bp', 1600, 1.2);
+    mixInto(b, crack, 0.01, 1.2);
+    mixInto(b, thump(0.12, 160, 80, 0.04, 0.6));
+    for (let i = 0; i < 4; i++) mixInto(b, modal(0.1, 500 + rnd() * 500, [1, 2.7], [1, 0.4], [0.03, 0.015]), 0.08 + rnd() * 0.4, 0.25);
+    return normalize(b, 0.85);
+  }
+  // 煉瓦：岩より低く重い
+  function brick() { const b = rock(1.3); return b; }
+  // 土：柔らかく崩れる
+  function dirt() {
+    const b = new Float32Array(len(0.5));
+    mixInto(b, burst(0.25, 0.06, 'lp', 700, 0.7, 1));
+    mixInto(b, thump(0.1, 120, 60, 0.03, 0.6));
+    for (let i = 0; i < 12; i++) mixInto(b, burst(0.02, 0.004, 'bp', 600 + rnd() * 1200, 1, 0.2), rnd() * 0.3);
+    return normalize(b, 0.75);
+  }
+  // 大理石・黒曜石：硬く高い打撃音
+  function hardStone(f0) {
+    const b = new Float32Array(len(0.5));
+    mixInto(b, modal(0.4, f0, [1, 2.3, 3.9, 5.6], [1, 0.6, 0.35, 0.2], [0.06, 0.04, 0.025, 0.015], 0.05));
+    mixInto(b, burst(0.02, 0.003, 'bp', 3500, 0.9, 1.2));
+    mixInto(b, thump(0.06, 200, 100, 0.015, 0.6));
+    return normalize(b, 0.8);
+  }
+  // 水晶：澄んだ響き
+  function crystal() {
+    const b = new Float32Array(len(1.6));
+    mixInto(b, glass(0.8, 10), 0, 0.6);
+    mixInto(b, modal(1.5, 1320, [1, 2.0, 2.76, 4.07], [1, 0.4, 0.3, 0.15], [0.9, 0.5, 0.35, 0.2], 0.003), 0.01, 0.7);
+    return normalize(b, 0.85);
+  }
+  // 爆発：衝撃波の低音＋破裂＋瓦礫
+  function boom() {
+    const b = new Float32Array(len(2.2));
+    mixInto(b, thump(0.9, 90, 32, 0.25, 1.6));
+    mixInto(b, burst(0.6, 0.12, 'lp', 900, 0.7, 2.2));
+    mixInto(b, burst(0.05, 0.01, 'hp', 1500, 0.7, 1.4));
+    for (let i = 0; i < 6; i++) mixInto(b, rock(1.2 + rnd()), 0.05 + rnd() * 0.8, 0.3);
+    return normalize(b, 0.98);
+  }
+  // ジャスト打ち返し：重い金属音＋風切り
+  function powerHit() {
+    const b = new Float32Array(len(1.0));
+    mixInto(b, metal(420, 1.0), 0, 0.9);
+    mixInto(b, paddle(), 0, 0.6);
+    const w = new Float32Array(len(0.4));
+    for (let i = 0; i < w.length; i++) w[i] = white() * Math.sin(Math.PI * i / w.length);
+    for (let s = 0; s < w.length; s += 256) biquad(w, 'bp', 600 + 3000 * s / w.length, 2, s, Math.min(w.length, s + 256));
+    mixInto(b, w, 0.02, 0.6);
+    mixInto(b, thump(0.25, 130, 50, 0.06, 1.2));
+    return normalize(b, 0.95);
+  }
+  function coinPick() {
+    const b = new Float32Array(len(0.5));
+    mixInto(b, modal(0.5, 3400 + rnd() * 400, [1, 1.62, 2.51, 3.6], [1, 0.7, 0.5, 0.3], [0.25, 0.18, 0.12, 0.08]));
+    mixInto(b, modal(0.4, 4700 + rnd() * 400, [1, 1.62, 2.51], [1, 0.6, 0.4], [0.2, 0.14, 0.1]), 0.05, 0.6);
+    return normalize(b, 0.7);
+  }
+  function miss() {
+    const b = new Float32Array(len(0.6));
+    mixInto(b, thump(0.2, 140, 70, 0.05, 0.8), 0.15);
+    mixInto(b, burst(0.2, 0.04, 'lp', 600, 0.7, 0.5), 0.15);
+    return normalize(b, 0.5);
+  }
+  function launch() {
+    const b = new Float32Array(len(0.3));
+    mixInto(b, modal(0.3, 1800, [1, 2.76, 5.4], [1, 0.4, 0.2], [0.07, 0.04, 0.02]), 0, 0.6);
+    mixInto(b, thump(0.1, 260, 120, 0.02, 1));
+    return normalize(b, 0.7);
+  }
+
   function toBuffer(arr) {
     const b = ctx.createBuffer(1, arr.length, sr);
     b.getChannelData(0).set(arr);
@@ -247,10 +342,14 @@ window.BallAudio = (() => {
   // 生成に時間がかかるので、よく使う音から少しずつ作る（タップ直後に固まらないように）
   function build() {
     const jobs = [
-      ['paddle', paddle, 4], ['rockBreak', () => rock(1), 4], ['wood', wood, 3], ['rockChip', rockChip, 3],
-      ['metalHit', () => metal(700 + rnd() * 250, 0.8), 3],
+      ['paddle', paddle, 4], ['launch', launch, 2], ['rockBreak', () => rock(1), 4], ['wood', wood, 3], ['rockChip', rockChip, 3],
+      ['dirt', dirt, 3], ['brick', brick, 3], ['woodBreak', woodBreak, 3], ['glass', () => glass(1 + (rnd() - 0.5) * 0.2), 3], ['glassTick', glassTick, 3],
+      ['metalHit', () => metal(700 + rnd() * 250, 0.8), 3], ['metalBreak', metalBreak, 2],
+      ['marble', () => hardStone(1700 + rnd() * 300), 3], ['obsidian', () => hardStone(2600 + rnd() * 400), 3],
+      ['ice', () => glass(0.6 + rnd() * 0.1, 10), 2], ['crystal', crystal, 2], ['boom', boom, 2], ['power', powerHit, 2],
+      ['coin', coinPick, 3], ['miss', miss, 1],
       ['treasureCrack', () => { const b = rockChip(); return mixInto(b, modal(0.2, 4200, [1, 1.6, 2.5], [1, 0.6, 0.3], [0.12, 0.08, 0.05]), 0.01, 0.4); }, 2],
-      ['coins', coins, 2], ['metalBreak', metalBreak, 2], ['fall', fall, 1], ['levelUp', () => bell(523), 1],
+      ['coins', coins, 2], ['fall', fall, 1], ['levelUp', () => bell(523), 1],
       ['equip', () => bell(784, 1.4), 1], ['collapse', collapse, 1],
       ['over', () => { const b = new Float32Array(len(3)); mixInto(b, bell(196, 2.8), 0, 0.8); mixInto(b, collapse(), 0, 0.6); return normalize(b, 0.9); }, 1],
       ['ambient', ambient, 1],
@@ -291,7 +390,7 @@ window.BallAudio = (() => {
     const now = ctx.currentTime;
     // 多球時に同じ音が重なりすぎないよう間引く
     if (lastPlay[name] && now - lastPlay[name] < (opt.gap ?? 0.03)) return;
-    if (voices > 20) return;
+    if (voices > 28) return;
     lastPlay[name] = now;
     const list = bank[name];
     const src = ctx.createBufferSource();
